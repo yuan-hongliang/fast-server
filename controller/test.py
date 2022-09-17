@@ -1,4 +1,4 @@
-from fast_server import controller, mapping, MediaFile
+from fast_server import controller, router, MediaFile
 from fast_server import GET, POST
 from fast_server import HttpRequest
 from time import sleep
@@ -7,7 +7,7 @@ import datetime
 
 @controller(value="/test")
 class Test3(object):
-    @mapping(value="/hello")
+    @router(value="/hello")
     def test(self, name, pwd, request: HttpRequest):
         data = {
             'name': name,
@@ -17,7 +17,7 @@ class Test3(object):
         }
         return data
 
-    @mapping(value="/helloll")
+    @router(value="/helloll")
     def test2(self):
         with open("C:/Users/86132/Desktop/资源/图片资源/background/一/1589473051347.png", "rb") as f:
             bytes_ = f.read()
@@ -39,7 +39,7 @@ class Test4:
     def __init__(self):
         self.aaaaa = "a"
 
-    @mapping(value="/hello2", method=POST)
+    @router(value="/hello2", method=POST)
     def test(self, name, pwd):
         # data={"name":name,"pwd":pwd,1:1}
         # print(data)
@@ -67,7 +67,7 @@ class Test4:
 
 
 class Test5:
-    @mapping(value="/hello3")
+    @router(value="/hello3")
     def test(self):
         print("test")
 
@@ -85,7 +85,7 @@ class Test5:
 
 
 class Test6:
-    @mapping(value="/hello4")
+    @router(value="/hello4")
     def test(self):
         print("test")
 
@@ -104,7 +104,7 @@ class Test6:
 
 @controller()
 class Test25:
-    @mapping(value="/hello5", method=POST)
+    @router(value="/hello5", method=POST)
     def test(self):
         print("test")
 

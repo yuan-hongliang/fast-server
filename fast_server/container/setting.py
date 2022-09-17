@@ -107,6 +107,13 @@ class Setting:
         self.init(setting_path, setting_data)
 
     def init(self, setting_path: str = None, setting_data: dict = None):
+        """
+        初始化配置数据，
+        当两个值都不唯None时，他会先加载setting_path，然后加载setting_data
+        :param setting_path: 配置文件路径
+        :param setting_data: 配置文件数据，他是一个字典
+        :return: None
+        """
         if setting_path is not None:
             with open(setting_path, 'r', encoding='UTF-8') as f:
                 setting = json.load(f)

@@ -47,19 +47,28 @@ def _mapping(fn, value, method):
     return fn
 
 
-def mapping(value, method="all"):
+def router(value, method="all"):
+    """
+    ---------------------------
+    0.2.3
+    由mapping改为router
+    ---------------------------
+    :param value:
+    :param method:
+    :return:
+    """
     def __mapping(fn):
         return _mapping(fn, value, method)
     return __mapping
 
 
-def get_mapping(value):
+def get_router(value):
     def __mapping(fn):
         return _mapping(fn, value, GET)
     return __mapping
 
 
-def post_mapping(value):
+def post_router(value):
     def __mapping(fn):
         return _mapping(fn, value, POST)
     return __mapping

@@ -1,5 +1,6 @@
 from .setting import Setting
 from ..application.futures import HttpRequest, HttpResponse
+from ..application.tools import pprint
 
 import traceback
 import inspect
@@ -36,6 +37,38 @@ class Container(Base):
         self.filter = FilterChain()
         self.reject = None
 
+    def init_mapping(self, setting: Setting):
+        """
+        0.2.3新增
+        将原来的init()函数拆分，只保留了mapping和reject的初始化
+        拆分是为了能够确保add_router添加的mapping和filter在对应对象初始化后分别正确的添加
+        :param setting:
+        :return:
+        """
+        # 启动ControllerMapping()对象的初始化程序
+        self.mapping.init(setting)
+        pprint("'controller' loading completed")
+
+        # 初始化拦截队列
+        self.reject = setting.container_reject
+
+    def init_filter(self, setting: Setting):
+        """
+        0.2.3新增
+        将原来的init()函数拆分，只保留了filter的初始化
+        拆分是为了能够确保add_router添加的mapping和filter在对应对象初始化后分别正确的添加
+        :param setting:
+        :return:
+        """
+        # 在完成了mapping的初始化后，获取已经保存的所有controller的path，放入一个path列表中
+        path_list = []
+        for method in self.mapping.controller:
+            path_list += self.mapping.controller[method].keys()
+        path_list = list(set(path_list))
+        # 将path列表作为参数传递给FilterChain()的init函数，完成filer的初始化
+        self.filter.init(setting, path_list)
+        pprint("'filter' loading completed")
+
     def init(self, setting: Setting):
         """
         Container的初始化函数，需要调用这个类来完成容器对象的初始化
@@ -46,6 +79,7 @@ class Container(Base):
         """
         # 启动ControllerMapping()对象的初始化程序
         self.mapping.init(setting)
+        pprint("'controller' loading completed")
 
         # 在完成了mapping的初始化后，获取已经保存的所有controller的path，放入一个path列表中
         path_list = []
@@ -54,6 +88,7 @@ class Container(Base):
         path_list = list(set(path_list))
         # 将path列表作为参数传递给FilterChain()的init函数，完成filer的初始化
         self.filter.init(setting, path_list)
+        pprint("'filter' loading completed")
 
         # 初始化拦截队列
         self.reject = setting.container_reject
@@ -118,6 +153,30 @@ class Container(Base):
     def run_function(self, request: HttpRequest) -> tuple:
         """
         执行具体的业务函数
+        ---------------------------------------------------------
+        0.2.3
+        修改了参数的获取逻辑，
+        首先通过inspect.signature(fn).parameters.keys()获取所有非self的参数名
+        然后通过inspect.getfullargspec(fn).defaults获取所有的默认参数
+        再通过 inspect.getfullargspec(fn).annotations获取参数定义的数据类型
+        defaults_index = len(defaults) - len(parameters)来正确的导入默认参数
+
+            此版本前使用的参数设置方式：
+            _count = count = fn.__code__.co_argcount
+            for item in fn.__code__.co_varnames:
+                if count != _count:
+                    if item in parameter_map:
+                        args += "\"" + str(parameter_map[item]) + "\","
+                    elif item == "request":
+                        args += "request,"
+                    else:
+                        args += "None,"
+                count -= 1
+                if count == 0:
+                    break
+
+        修改后函数支持默认参数，以及传递给定的参数类型
+        ---------------------------------------------------------
         :param request: 请求体
         :return: request, response
         """
@@ -136,18 +195,50 @@ class Container(Base):
                 # 按照get请求和post请求的方式获取对应的请求参数
                 parameter_map = request.parameter if request.method == 'get' else request.form
                 args = ""
-                _count = count = fn.__code__.co_argcount
-                for item in fn.__code__.co_varnames:
-                    if count != _count:
-                        if item in parameter_map:
+
+                # 获取其所有的非self方法
+                # inspect.getfullargspec(fn).args也能获取所有的参数，但是他拿到的参数会包括'self'
+                parameters = inspect.signature(fn).parameters.keys()
+
+                # 获取所有的默认参数，以及给定的参数类型
+                full_arg_spec = inspect.getfullargspec(fn)
+                # 默认参数
+                defaults = full_arg_spec.defaults
+                # 给定的参数类型
+                annotations = full_arg_spec.annotations
+
+                # 确保默认参数列表
+                defaults = defaults if defaults else []
+                # 获取默认参数列表索引，<0时说名当前的参数没有设置默认值
+                defaults_index = len(defaults) - len(parameters)
+                # 遍历函数的参数列表
+                for item in parameters:
+                    # 如果能在请求参数中找到同名的参数，使用请求参数中的数据
+                    if item in parameter_map:
+                        # 如果函数给定的参数类型是str，或者没有指定特定的参数类型时，使用str
+                        if annotations.get(item, type(str)) == type(str):
                             args += "\"" + str(parameter_map[item]) + "\","
-                        elif item == "request":
-                            args += "request,"
+                        else:
+                            # 否则直接传递数据过
+                            args += str(parameter_map[item]) + ","
+                    # 如果item是request，将request对象传递过去
+                    elif item == "request":
+                        args += "request,"
+                    else:
+                        # 否则传递一个默认值
+                        # 如果当前的参数存在默认值，则将这个默认值传递过去
+                        if defaults_index >= 0:
+                            # 下面的判断逻辑同上
+                            type_ = annotations.get(item, type(str))
+                            if type(str) == type_ and isinstance(defaults[defaults_index], str):
+                                args += "\"" + str(defaults[defaults_index]) + "\","
+                            else:
+                                args += str(defaults[defaults_index]) + ","
+                        # 否则传递一个None值
                         else:
                             args += "None,"
-                    count -= 1
-                    if count == 0:
-                        break
+                    defaults_index += 1
+
                 '''
                 所有参数以字符串的形式添加到方法后，
                 通过eval函数执行
@@ -223,6 +314,7 @@ def get_all_class(page_list: list):
     :type page_list: list
     :return: list 类列表
     """
+    default_class = {"controller", "filter"}
     class_list = []
 
     # 去重
@@ -233,14 +325,17 @@ def get_all_class(page_list: list):
             # 尝试导入这个包
             imp_module = __import__(item)
         except ImportError:
-            print(traceback.format_exc())
-            # 导入失败则直接跳过
+            if item not in default_class:
+                pprint("no module name '{}'".format(item), color='red')
+            # print(traceback.format_exc())
+            # 导入失败则跳过
             pass
         else:
             # 导入成功后则将包块下的类加载到类列表中
             for name, _ in inspect.getmembers(sys.modules[item], inspect.isclass):
                 obj = getattr(imp_module, name)
                 class_list.append(obj)
+            pprint("The module '{}' has been identified".format(item))
     # 返回这个列表
     return class_list
 
@@ -306,12 +401,23 @@ class ControllerMapping(Base):
     def add(self, name, fn, method):
         """
         添加一个controller
+
+        -----------------------------
+        0.2.3
+        增加对method的判断，当他为all时将会吧所有的method都走一遍，
+        增加对path的格式判定修改
+        -----------------------------
         :param name: path
         :param fn: 请求的执行函数
         :param method: 请求方式，post,get
         :return: None
         """
-        self.controller[method][name] = fn
+        name = remove_redundant_slashes(name)
+        if method == 'all':
+            for m in ControllerMapping.methods:
+                self.add(name, fn, m)
+        else:
+            self.controller[method][name] = fn
         # if method == 'post':
         #     self.post_mapping[name] = fn
         # else:
