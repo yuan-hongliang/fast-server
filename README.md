@@ -76,7 +76,7 @@ project
 
 ## 4.setting.json
 
-```
+```json
 {
   "container": {
     "controller": [
