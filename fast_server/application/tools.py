@@ -9,4 +9,14 @@ color_list = {
 
 
 def pprint(value: str, color='default', end='\n'):
+    """
+    -----------------------
+    0.2.3 新增
+    格式化输出数据
+    -----------------------
+    :param value:
+    :param color:
+    :param end:
+    :return:
+    """
     print("\033[{}m".format(color_list.get(color, '38')) + value + "\033[0m", end=end)

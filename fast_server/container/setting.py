@@ -11,7 +11,7 @@
 #   },
 #   "server": {
 #     "host": "0.0.0.0",
-#     "post": "8089",
+#     "port": "8089",
 #     "monitor": "1000",
 #     "requesters": "1000",
 #     "workers": "1000",
@@ -29,40 +29,44 @@ ver = {"container_controller": "list",
        "container_filter": "list",
        "container_reject": "list",
        "server_host": "str",
-       "server_post": "int",
-       "server_monitor": "int",
-       "server_requesters": "int",
+       "server_port": "int",
        "server_workers": "int",
        "server_waiters": "int",
+       "server_process": "bool",
        "log_path": "str",
        "log_max": "int"}
 
-ver_int = {"server_post",
-           "server_monitor",
-           "server_requesters",
+ver_int = {"server_port",
            "server_workers",
            "server_waiters",
            "log_max"}
 
 ver_list = {"container_controller",
             "container_filter",
-            "container_reject"}
+            "container_reject",
+            "container_resources"}
+
+ver_bool = {"server_process"}
 
 
 class Setting:
     """
     Setting 类用来保存所有配置数据
+    ---------------------------------
+    0.2.4
+    端口号拼错了改一下
+    之前是post，现改为port
+    ---------------------------------
 
     Attributes:
         container_controller(list): controller包名
         container_filter(list): 过滤器包名
         container_reject(list): 拦截队列
         server_host(str): 主机号
-        server_post(int): 端口号
-        server_monitor(int): 监听者数量
-        server_requesters(int): 请求队列长度
+        server_port(int): 端口号
         server_workers(int): 工作内核数量
         server_waiters(int): 等待队列长度
+        server_process(bool): 是否开启多进程
         log_path(str): 日志保存地址
         log_max(int): 日志最大长度
     """
@@ -70,12 +74,12 @@ class Setting:
     container_controller = ["controller"]
     container_filter = ["filter"]
     container_reject = []
+    container_resources = ['resource']
     server_host = "0.0.0.0"
-    server_post = 8089
-    server_monitor = 100
-    server_requesters = 1000
-    server_workers = 1000
-    server_waiters = 1000
+    server_port = 8089
+    server_workers = 1
+    server_waiters = 0
+    server_process = False
     log_path = "log.txt"
     log_max = 1000
 
@@ -93,13 +97,13 @@ class Setting:
         self.container_controller = ["controller"]
         self.container_filter = ["filter"]
         self.container_reject = []
+        self.container_resources = ['resource']
 
         self.server_host = "0.0.0.0"
-        self.server_post = 8089
-        self.server_monitor = 100
-        self.server_requesters = 1000
-        self.server_workers = 1000
-        self.server_waiters = 1000
+        self.server_port = 8089
+        self.server_workers = 1
+        self.server_waiters = 0
+        self.server_process = False
 
         self.log_path = "log.txt"
         self.log_max = 1000
@@ -139,6 +143,8 @@ class Setting:
     def __set_data(self, val, data):
         if val in ver_int:
             data = int(data)
+        if val in ver_bool:
+            data = eval(data)
         setattr(self, val, data)
 
     def _verification(self):

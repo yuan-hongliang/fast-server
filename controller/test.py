@@ -5,117 +5,29 @@ from time import sleep
 import datetime
 
 
-@controller(value="/test")
+@controller(value="/user")
 class Test3(object):
-    @router(value="/hello")
+    @router(value="/login")
     def test(self, name, pwd, request: HttpRequest):
         data = {
             'name': name,
             'pwd': pwd,
-            3: 3,
             'method': request.method
         }
+        for i in data:
+            request.cookie[i] = data[i]
         return data
 
-    @router(value="/helloll")
-    def test2(self):
-        with open("C:/Users/86132/Desktop/资源/图片资源/background/一/1589473051347.png", "rb") as f:
-            bytes_ = f.read()
-        media_file = MediaFile(bytes_)
-        return media_file
+    @router(value="/info")
+    def test2(self, request: HttpRequest):
+        print(request.cookie.id)
+        for key, value in request.cookie.items():
+            print(key, value)
+        return request.cookie.get_attribute("name")
 
-    def test3(self):
-        print("test3")
-
-    def test4(self):
-        print("test4")
-
-    def test5(self):
-        print("test5")
+    @router("/img")
+    def get_img(self, request: HttpRequest):
+        return request.redirect("/img1.jpg")
 
 
-@controller()
-class Test4:
-    def __init__(self):
-        self.aaaaa = "a"
 
-    @router(value="/hello2", method=POST)
-    def test(self, name, pwd):
-        # data={"name":name,"pwd":pwd,1:1}
-        # print(data)
-        data = {
-            'name': name,
-            'pwd': pwd,
-            3: 3,
-            "aaaa": self.aaaaa,
-            'method': 'post'
-        }
-        return data
-        # return name+pwd
-
-    def test2(self):
-        print("test2")
-
-    def test3(self):
-        print("test3")
-
-    def test4(self):
-        print("test4")
-
-    def test5(self):
-        print("test5")
-
-
-class Test5:
-    @router(value="/hello3")
-    def test(self):
-        print("test")
-
-    def test2(self):
-        print("test2")
-
-    def test3(self):
-        print("test3")
-
-    def test4(self):
-        print("test4")
-
-    def test5(self):
-        print("test5")
-
-
-class Test6:
-    @router(value="/hello4")
-    def test(self):
-        print("test")
-
-    def test2(self):
-        print("test2")
-
-    def test3(self):
-        print("test3")
-
-    def test4(self):
-        print("test4")
-
-    def test5(self):
-        print("test5")
-
-
-@controller()
-class Test25:
-    @router(value="/hello5", method=POST)
-    def test(self):
-        print("test")
-
-    def test2(self):
-        print("test2")
-
-    def test3(self):
-        print("test3")
-
-    def test4(self):
-        print("test4")
-
-    def test5(self):
-        print("test5")

@@ -1,6 +1,9 @@
+import os
+
 from .setting import Setting
-from ..application.futures import HttpRequest, HttpResponse
+from ..application.fast_http import HttpRequest, HttpResponse
 from ..application.tools import pprint
+from ..application.cookies import Sessions
 
 import traceback
 import inspect
@@ -31,26 +34,46 @@ class Container(Base):
     mapping: 保存所有controller
     filter: 保存所有filter
     reject: 是一个列表，ip地址拦截队列
+    -----------------------------------------------------------------
+    0.3.0 修改
+    添加 resource 属性
+    修改了init_mapping方法
+    -----------------------------------------------------------------
     """
     def __init__(self):
         self.mapping = ControllerMapping()
         self.filter = FilterChain()
         self.reject = None
+        self.resource = Resource()
+        self.session = Sessions()
 
     def init_mapping(self, setting: Setting):
         """
-        0.2.3新增
+        -----------------------------------------------------------------
+        0.2.3 新增
         将原来的init()函数拆分，只保留了mapping和reject的初始化
         拆分是为了能够确保add_router添加的mapping和filter在对应对象初始化后分别正确的添加
+        -----------------------------------------------------------------
+        0.3.0 修改
+        添加对resource对象的初始化
+        以及将资源文件添加进mapping中
+        -----------------------------------------------------------------
         :param setting:
         :return:
         """
         # 启动ControllerMapping()对象的初始化程序
         self.mapping.init(setting)
-        pprint("'controller' loading completed")
+        pprint("controller loading completed\n" + "----------"*3)
 
         # 初始化拦截队列
         self.reject = setting.container_reject
+        pprint("reject_list loading completed\n" + "----------"*3)
+
+        # 初始化资源文件
+        self.resource.init(setting)
+        for path in self.resource.res_path:
+            self.mapping.add(path, self.resource.get_resource, 'all')
+        pprint("resource loading completed\n" + "----------"*3)
 
     def init_filter(self, setting: Setting):
         """
@@ -67,7 +90,7 @@ class Container(Base):
         path_list = list(set(path_list))
         # 将path列表作为参数传递给FilterChain()的init函数，完成filer的初始化
         self.filter.init(setting, path_list)
-        pprint("'filter' loading completed")
+        pprint("filter loading completed\n" + "----------"*3)
 
     def init(self, setting: Setting):
         """
@@ -101,7 +124,7 @@ class Container(Base):
         :param environ: 请求体
         :return: response
         """
-        request = HttpRequest(environ)
+        request = HttpRequest(environ, self.session)
         response = self.task(request)
         return response
 
@@ -137,6 +160,7 @@ class Container(Base):
                     执行Filter.after()
                     """
                     request, response = self.run_filter_after(request, response)
+                    response.cookie = request.cookie
         except Exception as ex:
             """
             当task执行过程中出现异常时，修改空的response
@@ -739,3 +763,102 @@ class OrderDic:
             st += ("'"+i+"'" if isinstance(i, str) else str(i)) + ": " + \
                   ("'"+value+"'" if isinstance(value, str) else str(value))+","
         return st[:-1]+"} "
+
+
+class Resource(Base):
+    """
+    0.3.0 添加
+    实现对资源文件的扫描
+    res_path 资源文件
+        数据保存方式
+        {path1: name1, path2: name2}
+        说明：
+            path: 加载到mapping后的名称或者叫path，例如：/index.html
+            name：资源文件的名称，在计算机中的相对路径，例如：resource/index.html
+    """
+
+    def __init__(self):
+        self.res_path = {}
+
+    def init(self, setting: Setting):
+        """
+        扫描所有资源文件，添加进res_path
+        :param setting:
+        :return:
+        """
+        for file in Setting.container_resources:
+            if os.path.isdir(file):
+                pprint("'{}' folder scanning completed".format(file))
+                for name in Resource.get_all_files(file):
+                    path = name[name.find('/'):]
+                    if path.find("/index.") >= 0:
+                        self.res_path.update({'/': name})
+                    self.res_path.update({path: name})
+            else:
+                if file != 'resource':
+                    pprint("'{}' folder not found or it is not a folder".format(file), color='red')
+
+    def get_resource(self, request: HttpRequest) -> HttpResponse:
+        """
+        这个函数将被作为值添加到mapping中
+        资源文件被引用时，run_function函数将调用它
+        获取文件访问路径并打包资源文件
+        :param request:
+        :return:
+        """
+        path = request.path
+        if path in self.res_path:
+            return Resource.get_resource_response(self.res_path[path])
+        return HttpResponse(data="this resource is not Found!", status=404)
+
+    @staticmethod
+    def get_all_files(dir_: str) -> list:
+        """
+        获取文件夹下所有文件的名字
+        :param dir_: 文件夹名
+        :return: list
+        """
+        file_list = []
+        files = os.listdir(dir_)
+        for file in files:
+            file = dir_ + "/" + file
+            if os.path.isdir(file):
+                file_list += Resource.get_all_files(file)
+            else:
+                file_list.append(file)
+        return file_list
+
+    @staticmethod
+    def get_resource_response(file_path: str) -> HttpResponse:
+        """
+        将资源文件打包为Response对象
+        -----------------------------------
+        0.4.0
+        现在他创建response对象时会直接将Resource.file_iterator返回的生成器做为data的参数
+        -----------------------------------
+        :param file_path:
+        :return:
+        """
+        response = HttpResponse(Resource.file_iterator(file_path))
+
+        file_paths = file_path.split('/')
+        index = file_paths[-1].rfind('.')
+        if index > 0:
+            response.set_content_type(file_paths[-1][index+1:])
+        return response
+
+    @staticmethod
+    def file_iterator(file_path, chunk_size=512):
+        """
+        文件读取迭代器
+        :param file_path:文件路径
+        :param chunk_size: 每次读取流大小
+        :return: itr
+        """
+        with open(file_path, 'rb') as target_file:
+            while True:
+                chunk = target_file.read(chunk_size)
+                if chunk:
+                    yield chunk
+                else:
+                    break

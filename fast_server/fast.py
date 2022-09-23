@@ -5,7 +5,8 @@ from .container import Log
 from .container import Setting
 from .application.tools import pprint
 
-from wsgiref.simple_server import make_server
+# from wsgiref.simple_server import make_server
+from .application.wsgi_app import make_server, make_multi_server
 
 
 class Fast:
@@ -25,7 +26,7 @@ class Fast:
         :param server
         """
         if server is not None and setting_data is None:
-            setting_data = {"server_host": server[0], "server_post": server[1]}
+            setting_data = {"server_host": server[0], "server_port": server[1]}
 
         self.setting = Setting(setting_path, setting_data)
         self._container = Container()
@@ -95,15 +96,17 @@ class Fast:
         :param constructor:
         :return:
         """
-        self.__init(constructor)
+        # 初始化容器
+        self.__init_container()
+        # 初始化服务器
+        self.__init_server(constructor)
 
         self._server.serve_forever()
 
-    def __init(self, constructor):
+    def __init_container(self):
         """
-        0.2.2 添加constructor参数，支持启动时设置make_server
-        :param constructor:
-        :return:
+        0.4.0
+        由原先的__init()函数拆分
         """
         # 初始化容器
         self._container.init_mapping(self.setting)
@@ -122,23 +125,31 @@ class Fast:
         # 初始化完后将_init_list置为None
         self._init_list = None
 
+    def __init_server(self, constructor):
+        """
+        0.4.0
+        由原先的__init()函数拆分
+        """
         # 初始化服务器
         if constructor is None:
-            self._server = make_server(self.setting.server_host, self.setting.server_post, self)
-        elif type(constructor) == type(make_server):
+            if self.setting.server_workers > 1:
+                print("Enter a multithreaded environment")
+                self._server = make_multi_server(
+                    self.setting.server_host, self.setting.server_port, self,
+                    self.setting.server_workers, self.setting.server_waiters,
+                    self.setting.server_process
+                )
+            else:
+                self._server = make_server(self.setting.server_host, self.setting.server_port, self)
+        else:
             try:
-                self._server = constructor(self.setting.server_host, self.setting.server_post, self)
+                self._server = constructor(self.setting.server_host, self.setting.server_port, self)
             except TypeError:
                 traceback.print_exc()
                 pprint("An exception occurred while your constructor was executing", color='red')
                 pprint("Now we will use the default constructor to ensure that the program continues to execute", 'red')
-                self._server = make_server(self.setting.server_host, self.setting.server_post, self)
-        else:
-            pprint("The type of the constructor you provide is {}".format(type(constructor)), 'red')
-            pprint(",but wo need {}".format(type(make_server)), 'red')
-            pprint("Now we will use the default constructor to ensure that the program continues to execute", 'red')
-            self._server = make_server(self.setting.server_host, self.setting.server_post, self)
-        print('serve on %s:%d' % (self.setting.server_host, self.setting.server_post))
+                self._server = make_server(self.setting.server_host, self.setting.server_port, self)
+        pprint('server start on %s:%d' % (self.setting.server_host, self.setting.server_port), color='blue')
 
     def wsgi_app(self, environ, start_response):
         response = self._container.dispatch(environ)

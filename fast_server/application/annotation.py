@@ -1,4 +1,4 @@
-from .futures import Filter
+from .fast_http import Filter
 
 GET = "get"
 POST = "post"

@@ -6,15 +6,15 @@
     "filter": [
       "filter"
     ],
+    "resources": ["resource"],
     "reject": []
   },
   "server": {
     "host": "0.0.0.0",
-    "post": "8089",
-    "monitor": "1000",
-    "requesters": "1000",
+    "port": "8086",
     "workers": "1000",
-    "waiters": "1000"
+    "waiters": "0",
+    "process": "True"
   },
   "log": {
     "path": "log.txt",
