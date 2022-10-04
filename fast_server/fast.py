@@ -1,3 +1,5 @@
+__version__ = '0.6.0'
+
 import traceback
 
 from .container import Container
@@ -29,9 +31,9 @@ class Fast:
             setting_data = {"server_host": server[0], "server_port": server[1]}
 
         self.setting = Setting(setting_path, setting_data)
+        self._log = Log(self.setting)
         self._container = Container()
         self._server = None
-        self._log = Log()
         self._init_list = []
 
     def set_setting(self, setting_path: str = None, setting_data: dict = None):
@@ -124,6 +126,8 @@ class Fast:
                 fn(*args)
         # 初始化完后将_init_list置为None
         self._init_list = None
+        # 初始化拦截队列
+        self._container.init_allow_reject(self.setting)
 
     def __init_server(self, constructor):
         """
@@ -150,6 +154,7 @@ class Fast:
                 pprint("Now we will use the default constructor to ensure that the program continues to execute", 'red')
                 self._server = make_server(self.setting.server_host, self.setting.server_port, self)
         pprint('server start on %s:%d' % (self.setting.server_host, self.setting.server_port), color='blue')
+        Log().ilog('server start on %s:%d' % (self.setting.server_host, self.setting.server_port))
 
     def wsgi_app(self, environ, start_response):
         response = self._container.dispatch(environ)

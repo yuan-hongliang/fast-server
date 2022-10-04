@@ -28,6 +28,7 @@ import json
 ver = {"container_controller": "list",
        "container_filter": "list",
        "container_reject": "list",
+       "container_allow": "list",
        "server_host": "str",
        "server_port": "int",
        "server_workers": "int",
@@ -44,6 +45,7 @@ ver_int = {"server_port",
 ver_list = {"container_controller",
             "container_filter",
             "container_reject",
+            "container_allow",
             "container_resources"}
 
 ver_bool = {"server_process"}
@@ -74,6 +76,7 @@ class Setting:
     container_controller = ["controller"]
     container_filter = ["filter"]
     container_reject = []
+    container_allow = ["0.0.0.0"]
     container_resources = ['resource']
     server_host = "0.0.0.0"
     server_port = 8089
@@ -81,7 +84,7 @@ class Setting:
     server_waiters = 0
     server_process = False
     log_path = "log.txt"
-    log_max = 1000
+    log_max = 100
 
     def __init__(self, setting_path: str, setting_data: dict):
         """

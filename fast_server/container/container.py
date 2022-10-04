@@ -4,10 +4,14 @@ from .setting import Setting
 from ..application.fast_http import HttpRequest, HttpResponse
 from ..application.tools import pprint
 from ..application.cookies import Sessions
+from .fast_ip import IPList, IP
+from .log import Log
 
 import traceback
 import inspect
 import sys
+
+ip0 = IP("0.0.0.0")
 
 
 class Base:
@@ -43,7 +47,8 @@ class Container(Base):
     def __init__(self):
         self.mapping = ControllerMapping()
         self.filter = FilterChain()
-        self.reject = None
+        self.allow = IPList()
+        self.reject = IPList()
         self.resource = Resource()
         self.session = Sessions()
 
@@ -58,16 +63,16 @@ class Container(Base):
         添加对resource对象的初始化
         以及将资源文件添加进mapping中
         -----------------------------------------------------------------
+        0.6.0 修改
+        初始化拦截队列的功能拆出来
+        -----------------------------------------------------------------
         :param setting:
         :return:
         """
+
         # 启动ControllerMapping()对象的初始化程序
         self.mapping.init(setting)
         pprint("controller loading completed\n" + "----------"*3)
-
-        # 初始化拦截队列
-        self.reject = setting.container_reject
-        pprint("reject_list loading completed\n" + "----------"*3)
 
         # 初始化资源文件
         self.resource.init(setting)
@@ -92,29 +97,17 @@ class Container(Base):
         self.filter.init(setting, path_list)
         pprint("filter loading completed\n" + "----------"*3)
 
-    def init(self, setting: Setting):
-        """
-        Container的初始化函数，需要调用这个类来完成容器对象的初始化
-        __init__(self) 仅实现对象的构建，而属性的初始化需要调用这个函数实现
-        :param setting: 系统设置
-        :type setting: Setting
-        :return: None
-        """
-        # 启动ControllerMapping()对象的初始化程序
-        self.mapping.init(setting)
-        pprint("'controller' loading completed")
-
-        # 在完成了mapping的初始化后，获取已经保存的所有controller的path，放入一个path列表中
-        path_list = []
-        for method in self.mapping.controller:
-            path_list += self.mapping.controller[method].keys()
-        path_list = list(set(path_list))
-        # 将path列表作为参数传递给FilterChain()的init函数，完成filer的初始化
-        self.filter.init(setting, path_list)
-        pprint("'filter' loading completed")
-
+    def init_allow_reject(self, setting: Setting):
         # 初始化拦截队列
-        self.reject = setting.container_reject
+        self.reject.add_all(setting.container_reject)
+        pprint("reject_list loading completed")
+
+        if "0.0.0.0" in setting.container_allow:
+            setting.container_allow = ["0.0.0.0"]
+        self.allow.add_all(setting.container_allow)
+        print(self.allow)
+        pprint("allow_list loading completed")
+        pprint("----------" * 3)
 
     def dispatch(self, environ) -> HttpResponse:
         """
@@ -140,9 +133,11 @@ class Container(Base):
             '''
             拒绝该请求
             '''
-            if request.remote_addr in self.reject:
+            if (ip0 in self.allow or request.remote_addr in self.allow) and request.remote_addr not in self.reject:
+                pass
+            else:
                 request.prohibit = True
-                response.data = "Your IP is  to access this server"
+                response.data = "Your are denied access to this server"
                 response.set_status(403)
             '''
             处理Filter.before()
@@ -171,6 +166,7 @@ class Container(Base):
             response.set_status(500)
             print(ex)
             print(exc)
+            Log().wlog(response)
         finally:
             return response
 

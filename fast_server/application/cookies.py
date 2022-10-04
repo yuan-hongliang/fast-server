@@ -144,7 +144,7 @@ class Cookie(_BaseCookie):
 class Cache:
     def __init__(self, interval: int = 1):
         self.interval = interval
-        self.lock = threading.RLock()
+        self._lock = threading.RLock()
 
     def start(self):
         threading.Thread(target=self.loop_monitor).start()
@@ -174,11 +174,8 @@ class Session:
 class Sessions(Cache, dict):
 
     def task(self):
-        self.lock.acquire()
-        try:
+        with self._lock:
             self.listener()
-        finally:
-            self.lock.release()
 
     def listener(self):
         del_item = []

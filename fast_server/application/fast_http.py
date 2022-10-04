@@ -4,6 +4,7 @@ import json
 import uuid
 from urllib.parse import unquote, quote
 from .cookies import Cookie, Session
+from ..container.fast_ip import IP
 
 
 class HttpBase:
@@ -120,7 +121,7 @@ class HttpRequest(HttpBase):
         # 请求方法
         self.method = environ.get('REQUEST_METHOD', '').lower()
         # 客户端地址
-        self.remote_addr = environ.get('REMOTE_ADDR', '')
+        self.remote_addr = IP(environ.get('REMOTE_ADDR', '127.0.0.1'))
         # 请求题数据类型
         self.content_type = environ.get('CONTENT_TYPE', '')
         # 请求地址

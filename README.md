@@ -6,6 +6,9 @@
 
 `pip install fast-server`
 
+<p style="font-size: 25px;color: green">version=0.6.0</p>
+
+
 ---
 
 ## 2.使用框架启动服务器
@@ -90,14 +93,15 @@ project
       "filter"
     ],
     "resources": ["resource"],
-    "reject": []
+    "reject": [],
+    "allow": ["0.0.0.0"]
   },
   "server": {
     "host": "0.0.0.0",
     "port": "8086",
-    "workers": "1",
+    "workers": "1000",
     "waiters": "0",
-    "process": "False"
+    "process": "True"
   },
   "log": {
     "path": "log.txt",
@@ -298,20 +302,50 @@ server.serve_forever()
 
 ```
 
-### 4.4 reject_list
+### 4.4 reject_list和allow_list
 
+#### 4.4.1 reject_list
 这是一个拦截队列，在配置文件中的"`container_reject`"中定义，
 当服务器遇到拦截队列中的IP地址时，会直接阻止这个请求，并返回一个`403`
+
+你可以这样配置：
+```json
+{"container_reject": ["10.10.10.10"]}
+```
+这样IP地址为`10.10.10.10`的客户端将无法访问服务器
+
+你也可以设置掩码：
+```json
+{"container_reject": ["10.10.10.0/24"]}
+```
+这样`10.10.10.0-10.10.10.255`这一段ip的客户端都不能访问服务器
+
+> 1. 拦截队列在初始化时会尝试将能聚合的IP地址尽量聚合起来以减少检索时的压力。
+> 2. 拦截队列默认为空
+
+#### 4.4.2 allow_list
+用法和reject_list一样，在配置文件的"`container_allow`"中定义，
+他的优先级比`reject_list`低。
+
+如果你在`allow_list`中配置了`10.10.10.10`，`reject_list`在也配置了`10.10.10.10`，
+那么这个IP地址还是会被拒绝访问
+
+> 1. 允许队列默认值为`["0.0.0.0"]`
+> 2. `"0.0.0.0"`为允许所有ip访问
+
+
 
 ### 4.5 @post_router, @get_router
 这两个注解本质上都是@router
 
-`@post_router(value)` ==> `@outer(value, fast_server.POST)`
+`@post_router(value)` ==> `@router(value, fast_server.POST)`
 
-`@get_router(value)` ==> `@outer(value, fast_server.GET)`
+`@get_router(value)` ==> `@router(value, fast_server.GET)`
 
 
 ### 4.6 HttpRequest, HttpResponse
+
+#### 4.6.1 request
 
 request对象中封装了本次请求的所有数据，
 你可以在方法的参数中添加request，然后就可以在方法中使用这个对象
@@ -320,6 +354,50 @@ from fast_server import HttpRequest
 def test(name, pwd, request: HttpRequest):
     pass
 ```
+
+这个类的定义
+
+```python
+class HttpRequest:
+    # wsgi的environ
+    environ = None
+    # 请求方法
+    method = None
+    # 客户端地址
+    remote_addr = None
+    # 请求题数据类型
+    content_type = None
+    # 请求地址
+    path = None
+    # 请求体长度
+    content_length = None
+    # 请求体
+    body = None
+    # get请求中url中的请求参数
+    parameter = {}
+    # post请求中的表单
+    form = {}
+    # 该请求是被禁止
+    prohibit = False
+    
+    # cookie
+    cookie = None
+    session = None
+
+```
+
+1. `remote_addr`是一个`IP`对象，你可以使用`remote_addr.int()`获取ip的地址，
+    `remote_addr.version()`获取ip地址的版本
+    `remote_addr.int()`获取ip地址的16进制形式
+    `remote_addr.strBin()`获取ip地址的二进制形式
+2. 你可以通过设置`prohibit`为`True`，此时这个请求将会被返回`403`
+3. `form`和`prohibit`中的数据将会按照请求方式被加载到请求参数中
+    例如如果是get请求就是`prohibit`，如果是post请求就是`form`
+4. `environ`保存了此次请求的所有数据
+
+
+#### 4.6.1 response
+
 response对象会有服务器创建，在函数中使用return返回的数据都会被服务器解析后，
 打包为response对象。
 
@@ -333,6 +411,18 @@ def test():
     response = HttpResponse(data=data, charset='utf-8', status=200)
     return response
 ```
+
+### 4.7 Log日志
+1. `from fast_server import Log`
+2. `Log().log(info, _type)`普通日志，info为日志信息，_type为日志类型，
+    目前_type支持三种日志类型
+    1. INFO_LOG = 'info' 
+    2. WARN_LOG = 'warn' 
+    3. ERROR_LOG = 'error'
+    4. `from fast_server import NFO_LOG, WARN_LOG, ERROR_LOG`
+3. `Log().ilog(info)`它等于`Log().log(info, INFO_LOG)`
+4. `Log().wlog(info)`它等于`Log().log(info, WARN_LOG)`
+5. `Log().elog(info)`它等于`Log().log(info, ERROR_LOG)`
 
 ---
 

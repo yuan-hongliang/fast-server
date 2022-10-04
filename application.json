@@ -7,7 +7,8 @@
       "filter"
     ],
     "resources": ["resource"],
-    "reject": []
+    "reject": [],
+    "allow": ["0.0.0.1","0.0.0.2","0.0.0.3","0.0.0.4"]
   },
   "server": {
     "host": "0.0.0.0",
@@ -18,6 +19,6 @@
   },
   "log": {
     "path": "log.txt",
-    "max": "1000"
+    "max": "100"
   }
 }
